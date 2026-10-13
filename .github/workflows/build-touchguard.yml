@@ -300,7 +300,7 @@ jobs:
               }
           }
 
-   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
               override fun onDestroy() {
                   blocker?.let { try { wm.removeView(it) } catch (_: Exception) {} }
                   blocker = null
