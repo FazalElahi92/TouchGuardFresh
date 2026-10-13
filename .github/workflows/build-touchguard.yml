@@ -162,7 +162,7 @@ jobs:
               private lateinit var wm: WindowManager
               private var blocker: View? = null
               private var bubble: TextView? = null
-              private var blocked = false
+              private var mode = 0
               private var bubbleParams: WindowManager.LayoutParams? = null
 
               override fun onCreate() {
@@ -240,12 +240,9 @@ jobs:
                   wm.addView(b, p)
               }
 
-              private fun toggle() {
-                  if (blocked) {
-                      blocker?.let { try { wm.removeView(it) } catch (_: Exception) {} }
-                      blocker = null
-                      blocked = false
-                  } else {
+                     private fun toggle() {
+              when (mode) {
+                  0 -> {
                       val v = View(this).apply {
                           setBackgroundColor(Color.TRANSPARENT)
                           setOnTouchListener { _, _ -> true }
@@ -262,7 +259,8 @@ jobs:
                       try {
                           wm.addView(v, p)
                           blocker = v
-                          blocked = true
+                          mode = 1
+                          // Keep the floating toggle above the touch-blocking overlay.
                           bubble?.let { b ->
                               val bp = bubbleParams
                               try {
@@ -271,18 +269,42 @@ jobs:
                               } catch (_: Exception) {}
                           }
                       } catch (_: Exception) {
-                          blocked = false
+                          mode = 0
                       }
                   }
-                  bubble?.apply {
-                      text = if (blocked) "ON" else "TG"
-                      background = bg(if (blocked) Color.rgb(190, 55, 45) else Color.rgb(30, 105, 190))
+                  1 -> {
+                      blocker?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+                      blocker = null
+                      mode = 2
+                  }
+                  else -> {
+                      blocker?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+                      blocker = null
+                      mode = 0
                   }
               }
 
-              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+              // Green mode keeps the display awake using the small bubble window only.
+              bubbleParams?.let { p ->
+                  p.flags = p.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
+                  if (mode == 2) p.flags = p.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                  bubble?.let { try { wm.updateViewLayout(it, p) } catch (_: Exception) {} }
+              }
+              bubble?.apply {
+                  text = when (mode) { 1 -> "ON"; 2 -> "S"; else -> "TG" }
+                  background = bg(when (mode) {
+                      1 -> Color.rgb(190, 55, 45)    // red: block touches + keep screen on
+                      2 -> Color.rgb(35, 155, 75)    // green: keep screen on only
+                      else -> Color.rgb(30, 105, 190) // blue: inactive
+                  })
+              }
+          }
+
+   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
               override fun onDestroy() {
                   blocker?.let { try { wm.removeView(it) } catch (_: Exception) {} }
+                  blocker = null
+                  mode = 0
                   bubble?.let { try { wm.removeView(it) } catch (_: Exception) {} }
                   super.onDestroy()
               }
