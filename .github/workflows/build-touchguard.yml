@@ -1,6 +1,6 @@
 name: Build Touch Guard APK
 
-on:
+'on':
   workflow_dispatch:
   push:
     branches: ["main"]
